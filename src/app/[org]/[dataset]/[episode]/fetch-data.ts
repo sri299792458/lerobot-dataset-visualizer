@@ -29,8 +29,10 @@ export type CameraInfo = { name: string; width: number; height: number };
 export type DepthStreamDescriptor = {
   field: string;
   url: string;
+  previewUrl?: string;
   unit: string;
   maxSkewMs: number;
+  gridFps?: number;
   sourceTopic: string;
 };
 
@@ -118,10 +120,22 @@ type DepthInfoFile = {
   dataset_id: string;
   encoding: string;
   unit: string;
+  alignment_policy?: {
+    grid_fps?: number;
+    selector?: string;
+  };
   chunking?: {
     mode?: string;
     chunk?: string;
     filename_pattern?: string;
+  };
+  preview_videos?: {
+    encoding?: string;
+    chunking?: {
+      mode?: string;
+      chunk?: string;
+      filename_pattern?: string;
+    };
   };
   depth_fields?: Record<
     string,
@@ -204,12 +218,27 @@ function buildDepthStreamDescriptors(
   const filenamePattern =
     depthInfo.chunking?.filename_pattern ?? "file-{episode_index:03d}.parquet";
   const fileName = formatStringWithVars(filenamePattern, { episode_index: episodeId });
+  const previewChunk = depthInfo.preview_videos?.chunking?.chunk ?? "chunk-000";
+  const previewFilenamePattern =
+    depthInfo.preview_videos?.chunking?.filename_pattern ??
+    "file-{episode_index:03d}.mp4";
+  const previewFileName = formatStringWithVars(previewFilenamePattern, {
+    episode_index: episodeId,
+  });
 
   return Object.entries(depthInfo.depth_fields).map(([field, spec]) => ({
     field,
     url: buildVersionedUrl(repoId, version, `depth/${field}/${chunk}/${fileName}`),
+    previewUrl: depthInfo.preview_videos
+      ? buildVersionedUrl(
+          repoId,
+          version,
+          `depth_preview/${field}/${previewChunk}/${previewFileName}`,
+        )
+      : undefined,
     unit: spec.unit ?? depthInfo.unit ?? "millimeters",
     maxSkewMs: spec.max_skew_ms ?? 25,
+    gridFps: depthInfo.alignment_policy?.grid_fps,
     sourceTopic: spec.source_topic ?? "",
   }));
 }
