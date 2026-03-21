@@ -174,12 +174,15 @@ export function DepthStreamViewer({
               "frame_index",
               "timestamp",
             ]);
+            const firstTimestamp = rows.length
+              ? toNumber(rows[0].timestamp)
+              : 0;
 
             const frames = rows.map((row, rowIndex) => {
               return {
                 rowIndex,
                 frameIndex: toNumber(row.frame_index),
-                timestamp: toNumber(row.timestamp),
+                timestamp: toNumber(row.timestamp) - firstTimestamp,
               };
             });
 
