@@ -44,7 +44,19 @@ export function formatStringWithVars(
   format: string,
   vars: Record<string, string | number>,
 ): string {
-  return format.replace(/{(\w+)(?::\d+d)?}/g, (_, key) => String(vars[key]));
+  return format.replace(
+    /{(\w+)(?::(\d+)d)?}/g,
+    (_, key: string, width: string | undefined) => {
+      const value = vars[key];
+      if (value == null) return "";
+      if (!width) return String(value);
+
+      const numeric = typeof value === "number" ? value : Number(value);
+      if (!Number.isFinite(numeric)) return String(value);
+
+      return Math.trunc(numeric).toString().padStart(Number(width), "0");
+    },
+  );
 }
 
 // Fetch and parse the Parquet file
@@ -91,13 +103,14 @@ export async function readParquetColumn(
 export async function readParquetAsObjects(
   fileBuffer: ParquetFile,
   columns: string[] = [],
-  options?: { rowStart?: number; rowEnd?: number },
+  options?: { rowStart?: number; rowEnd?: number; utf8?: boolean },
 ): Promise<Record<string, unknown>[]> {
   return parquetReadObjects({
     file: fileBuffer,
     columns: columns.length > 0 ? columns : undefined,
     rowStart: options?.rowStart,
     rowEnd: options?.rowEnd,
+    utf8: options?.utf8,
   }) as Promise<Record<string, unknown>[]>;
 }
 

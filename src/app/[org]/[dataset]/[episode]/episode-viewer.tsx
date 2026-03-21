@@ -11,6 +11,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { postParentMessageWithParams } from "@/utils/postParentMessage";
 import { SimpleVideosPlayer } from "@/components/simple-videos-player";
+import DepthStreamViewer from "@/components/depth-stream-viewer";
 import DataRecharts from "@/components/data-recharts";
 import PlaybackBar from "@/components/playback-bar";
 import { TimeProvider, useTime } from "@/context/time-context";
@@ -131,6 +132,7 @@ function EpisodeViewerInner({
     datasetInfo,
     episodeId,
     videosInfo,
+    depthStreams,
     chartDataGroups,
     episodes,
     task,
@@ -636,6 +638,8 @@ function EpisodeViewerInner({
                   onVideosReady={() => setVideosReady(true)}
                 />
               )}
+
+              <DepthStreamViewer depthStreams={depthStreams} />
 
               {/* Language Instruction */}
               {task && (

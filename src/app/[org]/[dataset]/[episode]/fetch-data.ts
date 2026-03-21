@@ -26,6 +26,14 @@ const SERIES_NAME_DELIMITER = CHART_CONFIG.SERIES_NAME_DELIMITER;
 
 export type CameraInfo = { name: string; width: number; height: number };
 
+export type DepthStreamDescriptor = {
+  field: string;
+  url: string;
+  unit: string;
+  maxSkewMs: number;
+  sourceTopic: string;
+};
+
 export type DatasetDisplayInfo = {
   repoId: string;
   total_frames: number;
@@ -78,6 +86,7 @@ export type EpisodeData = {
   datasetInfo: DatasetDisplayInfo;
   episodeId: number;
   videosInfo: VideoInfo[];
+  depthStreams: DepthStreamDescriptor[];
   chartDataGroups: ChartRow[][];
   flatChartData: Record<string, number>[];
   episodes: number[];
@@ -103,6 +112,25 @@ type EpisodeMetadataV3 = {
 type ColumnDef = {
   key: string;
   value: string[];
+};
+
+type DepthInfoFile = {
+  dataset_id: string;
+  encoding: string;
+  unit: string;
+  chunking?: {
+    mode?: string;
+    chunk?: string;
+    filename_pattern?: string;
+  };
+  depth_fields?: Record<
+    string,
+    {
+      source_topic?: string;
+      unit?: string;
+      max_skew_ms?: number;
+    }
+  >;
 };
 
 function parsePositiveIntEnv(
@@ -143,6 +171,48 @@ const PREFERRED_PROGRESS_COLUMNS = [
   "progress_dense",
   "progress",
 ] as const;
+
+async function loadDepthInfo(
+  repoId: string,
+  version: string,
+): Promise<DepthInfoFile | null> {
+  const depthInfoUrl = buildVersionedUrl(repoId, version, "meta/depth_info.json");
+  try {
+    const response = await fetch(depthInfoUrl, { cache: "no-store" });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`Failed to fetch depth metadata: ${response.status} ${response.statusText}`);
+    }
+    return (await response.json()) as DepthInfoFile;
+  } catch (error) {
+    if (error instanceof Error && /404/.test(error.message)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function buildDepthStreamDescriptors(
+  repoId: string,
+  version: string,
+  episodeId: number,
+  depthInfo: DepthInfoFile | null,
+): DepthStreamDescriptor[] {
+  if (!depthInfo?.depth_fields) return [];
+
+  const chunk = depthInfo.chunking?.chunk ?? "chunk-000";
+  const filenamePattern =
+    depthInfo.chunking?.filename_pattern ?? "file-{episode_index:03d}.parquet";
+  const fileName = formatStringWithVars(filenamePattern, { episode_index: episodeId });
+
+  return Object.entries(depthInfo.depth_fields).map(([field, spec]) => ({
+    field,
+    url: buildVersionedUrl(repoId, version, `depth/${field}/${chunk}/${fileName}`),
+    unit: spec.unit ?? depthInfo.unit ?? "millimeters",
+    maxSkewMs: spec.max_skew_ms ?? 25,
+    sourceTopic: spec.source_topic ?? "",
+  }));
+}
 
 function evenlySampleIndices(length: number, target: number): number[] {
   if (length <= 0) return [];
@@ -651,6 +721,7 @@ async function getEpisodeDataV2(
     datasetInfo,
     episodeId,
     videosInfo,
+    depthStreams: [],
     chartDataGroups,
     flatChartData: sampledChartData,
     episodes,
@@ -695,6 +766,13 @@ async function getEpisodeDataV3(
     info,
     episodeMetadata,
   );
+  const depthInfo = await loadDepthInfo(repoId, version);
+  const depthStreams = buildDepthStreamDescriptors(
+    repoId,
+    version,
+    episodeId,
+    depthInfo,
+  );
 
   // Load episode data for charts
   const { chartDataGroups, flatChartData, ignoredColumns, task } =
@@ -708,6 +786,7 @@ async function getEpisodeDataV3(
     datasetInfo,
     episodeId,
     videosInfo,
+    depthStreams,
     chartDataGroups,
     flatChartData,
     episodes,
