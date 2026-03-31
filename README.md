@@ -11,6 +11,39 @@ license: apache-2.0
 
 # LeRobot Dataset Visualizer
 
+## Lab Fork Notes
+
+This repository is currently used as a separate sibling repo alongside the main
+`spark-data-collection` workspace.
+
+Compared with upstream `huggingface/lerobot-dataset-visualizer`, this fork
+currently adds support for the lab's local dataset workflow:
+
+- same-origin local dataset fetching instead of silently falling back to the
+  Hugging Face dataset base
+- detection of the optional `meta/depth_info.json` sidecar contract
+- episode viewer support for depth sidecars
+- depth rendering via preview videos instead of browser-side `png16_bytes`
+  decoding
+
+The current fork delta relative to upstream lives in:
+
+- `src/utils/versionUtils.ts`
+- `src/app/[org]/[dataset]/[episode]/fetch-data.ts`
+- `src/app/[org]/[dataset]/[episode]/episode-viewer.tsx`
+- `src/utils/parquetUtils.ts`
+- `src/components/depth-stream-viewer.tsx`
+
+Current local validation for these changes has included:
+
+```bash
+bun run type-check
+bun run build
+```
+
+When this repo is pushed to the lab organization, keep the upstream project as
+an `upstream` remote so future syncs remain straightforward.
+
 LeRobot Dataset Tool and Visualizer is a web application for interactive exploration and visualization of robotics datasets, particularly those in the LeRobot format. It enables users to browse, view, and analyze episodes from large-scale robotics datasets, combining synchronized video playback with rich, interactive data graphs.
 
 ## Project Overview
